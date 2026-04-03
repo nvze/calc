@@ -25,11 +25,7 @@
         .btn-anim:active { transform: scale(0.92); background-color: rgba(255,255,255,0.1); }
         input { font-size: 16px !important; }
         
-        .history-item { animation: slideIn 0.2s ease-out; }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .mode-active { background-color: #2563eb !important; color: white !important; font-weight: 900; }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans h-screen flex items-center justify-center p-0 sm:p-4 overflow-hidden selection:bg-blue-500">
@@ -41,7 +37,10 @@
                 <div class="bg-blue-600 text-[10px] font-black px-2 py-0.5 rounded-sm text-white tracking-tighter">NASE</div>
                 <h1 class="text-xs font-bold tracking-widest text-gray-400 uppercase">Scientific <span class="font-light opacity-40 italic">by Esan</span></h1>
             </div>
-            <div id="offline-badge" class="hidden text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">Offline</div>
+            <div class="flex gap-1">
+                <span id="deg-indicator" class="text-[10px] px-2 py-0.5 rounded bg-blue-600 font-bold">DEG</span>
+                <span id="rad-indicator" class="text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-500 font-bold">RAD</span>
+            </div>
         </div>
 
         <div class="flex-1 bg-gray-950 p-6 flex flex-col justify-end gap-2 relative overflow-hidden">
@@ -88,7 +87,7 @@
             <button onclick="append('3')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">3</button>
             <button onclick="append('-')" class="btn-anim p-4 text-2xl text-blue-400 font-bold">−</button>
 
-            <button onclick="append('deg')" class="btn-anim p-3 bg-gray-800/40 text-[10px] text-blue-300 rounded-xl font-black uppercase">Deg</button>
+            <button id="toggle-mode-btn" onclick="toggleAngleMode()" class="btn-anim p-3 bg-gray-800 text-[10px] text-gray-400 rounded-xl font-black uppercase tracking-tighter">Deg/Rad</button>
             <button onclick="append('0')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">0</button>
             <button onclick="append('.')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">.</button>
             <button onclick="calculate()" class="btn-anim p-4 bg-blue-600 text-white text-2xl font-black rounded-2xl shadow-lg shadow-blue-900/40">=</button>
@@ -104,18 +103,34 @@
         const historyDisplay = document.getElementById('history-display');
         let currentExp = '';
         let history = [];
+        let isDegreeMode = true; // Default ke Degree (Derajat)
 
-        window.onload = () => inputField?.focus();
-        document.addEventListener('click', (e) => { if(!e.target.closest('button')) inputField?.focus(); });
+        window.onload = () => {
+            inputField?.focus();
+            updateModeUI();
+        };
 
-        inputField?.addEventListener('input', (e) => {
-            currentExp = e.target.value;
-            updateDisplay();
-        });
+        function toggleAngleMode() {
+            isDegreeMode = !isDegreeMode;
+            updateModeUI();
+            updateDisplay(); // Update preview seketika
+        }
 
-        inputField?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); calculate(); }
-        });
+        function updateModeUI() {
+            const degInd = document.getElementById('deg-indicator');
+            const radInd = document.getElementById('rad-indicator');
+            const toggleBtn = document.getElementById('toggle-mode-btn');
+
+            if (isDegreeMode) {
+                degInd.className = "text-[10px] px-2 py-0.5 rounded bg-blue-600 font-bold text-white";
+                radInd.className = "text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-500 font-bold";
+                toggleBtn.classList.add('text-blue-400');
+            } else {
+                degInd.className = "text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-500 font-bold";
+                radInd.className = "text-[10px] px-2 py-0.5 rounded bg-blue-600 font-bold text-white";
+                toggleBtn.classList.remove('text-blue-400');
+            }
+        }
 
         function append(val) {
             currentExp += val;
@@ -136,14 +151,20 @@
             updateDisplay();
         }
 
-        // LOGIKA BARU PERSENTASE (BELANJA)
         function preprocessExpression(exp) {
-            // 1. Ubah "X + Y%" menjadi "X + (X * Y/100)"
-            // Regex ini mencari: [Angka1] [Operator +/-] [Angka2]%
-            let processed = exp.replace(/(\d+(?:\.\d+)?)\s*([\+\-])\s*(\d+(?:\.\d+)?)\%/g, "($1 $2 ($1 * ($3 / 100)))");
+            let processed = exp;
             
-            // 2. Jika % tidak diawali + atau -, anggap desimal biasa (misal: 10 * 5%)
+            // 1. Logika Diskon (45000 - 10%)
+            processed = processed.replace(/(\d+(?:\.\d+)?)\s*([\+\-])\s*(\d+(?:\.\d+)?)\%/g, "($1 $2 ($1 * ($3 / 100)))");
+            
+            // 2. Persentase Biasa
             processed = processed.replace(/(\d+(?:\.\d+)?)\%/g, "($1 / 100)");
+
+            // 3. Logika Degree/Radian untuk sin, cos, tan
+            if (isDegreeMode) {
+                // Mencari sin(angka), cos(angka), tan(angka) dan menambahkan ' deg' di dalamnya
+                processed = processed.replace(/(sin|cos|tan)\(([^)]+)\)/g, "$1(($2) deg)");
+            }
             
             return processed;
         }
@@ -184,7 +205,7 @@
             if (history.length > 20) history.shift();
 
             const item = document.createElement('div');
-            item.className = "history-item text-right opacity-80 p-1 hover:bg-gray-800/30 rounded-lg transition-colors cursor-pointer";
+            item.className = "text-right opacity-80 p-1 hover:bg-gray-800/30 rounded-lg transition-colors cursor-pointer";
             item.onclick = () => {
                 currentExp = exp;
                 inputField.value = exp;
@@ -202,9 +223,7 @@
             historyDisplay.scrollTop = 0;
         }
 
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
-        }
+        document.addEventListener('click', (e) => { if(!e.target.closest('button')) inputField?.focus(); });
     </script>
 </body>
 </html>
