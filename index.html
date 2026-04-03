@@ -17,11 +17,33 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.3.0/math.js"></script>
 
     <style>
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+        /* Custom Slim Scrollbar */
+        #history-display::-webkit-scrollbar {
+            width: 4px;
+        }
+        #history-display::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #history-display::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 10px;
+        }
+        #history-display::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+
         .btn-anim { transition: all 0.1s ease; touch-action: manipulation; }
         .btn-anim:active { transform: scale(0.92); background-color: rgba(255,255,255,0.1); }
-        input { font-size: 16px !important; } /* Mencegah auto-zoom iOS */
+        input { font-size: 16px !important; }
+        
+        /* Animasi masuk untuk history baru */
+        .history-item {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 font-sans h-screen flex items-center justify-center p-0 sm:p-4 overflow-hidden selection:bg-blue-500">
@@ -33,15 +55,15 @@
                 <div class="bg-blue-600 text-[10px] font-black px-2 py-0.5 rounded-sm text-white tracking-tighter">NASE</div>
                 <h1 class="text-xs font-bold tracking-widest text-gray-400 uppercase">Scientific <span class="font-light opacity-40 italic">by Esan</span></h1>
             </div>
-            <div id="offline-badge" class="hidden text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">Offline Mode</div>
+            <div id="offline-badge" class="hidden text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">Offline</div>
         </div>
 
-        <div class="flex-1 bg-gray-950 p-6 flex flex-col justify-end space-y-4 relative">
-            <div id="history-display" class="text-gray-500 text-right text-sm h-20 overflow-y-auto flex flex-col justify-end gap-1">
-                <div class="opacity-30 italic text-xs">No history yet</div>
+        <div class="flex-1 bg-gray-950 p-6 flex flex-col justify-end gap-4 relative overflow-hidden">
+            <div id="history-display" class="text-gray-500 text-right text-sm h-32 overflow-y-auto pr-2 flex flex-col gap-3 scroll-smooth">
+                <div class="opacity-30 italic text-xs mt-auto">No history yet</div>
             </div>
 
-            <div class="relative">
+            <div class="relative mt-2">
                 <input type="text" id="calc-input" class="w-full bg-transparent text-right text-4xl font-light focus:outline-none text-transparent caret-blue-500 absolute inset-0 z-10" autocomplete="off" autofocus>
                 <div id="formatted-input" class="w-full text-right text-4xl font-light min-h-[3.5rem] text-gray-100 break-words">0</div>
             </div>
@@ -54,7 +76,7 @@
             <button onclick="append(')')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-sm font-bold">)</button>
             <button onclick="append('sqrt(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-sm font-bold">√</button>
             <button onclick="append('^')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-sm font-bold">xⁿ</button>
-            <button onclick="clearAll()" class="btn-anim p-3 bg-red-500/10 text-red-500 rounded-xl text-xs font-black">AC</button>
+            <button onclick="clearAll()" class="btn-anim p-3 bg-red-500/10 text-red-500 rounded-xl text-xs font-black uppercase">AC</button>
 
             <button onclick="append('sin(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-xs">sin</button>
             <button onclick="append('cos(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-xs">cos</button>
@@ -74,7 +96,7 @@
             <button onclick="append('6')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">6</button>
             <button onclick="append('*')" class="btn-anim p-4 text-2xl text-blue-400 font-bold">×</button>
 
-            <button onclick="append('abs(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-xs uppercase font-bold">|x|</button>
+            <button onclick="append('abs(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-xs font-bold uppercase">|x|</button>
             <button onclick="append('1')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">1</button>
             <button onclick="append('2')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">2</button>
             <button onclick="append('3')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">3</button>
@@ -97,7 +119,6 @@
         let currentExp = '';
         let history = [];
 
-        // Focus logic
         window.onload = () => inputField?.focus();
         document.addEventListener('click', (e) => { if(!e.target.closest('button')) inputField?.focus(); });
 
@@ -160,29 +181,41 @@
         function addToHistory(exp, res) {
             if (history.length === 0) historyDisplay.innerHTML = '';
             history.push({ exp, res });
-            if (history.length > 5) history.shift();
+            
+            // Batasi 20 item agar tidak terlalu berat, tapi tetap scrollable
+            if (history.length > 20) history.shift();
 
             const item = document.createElement('div');
-            item.className = "text-right opacity-80 animate-in fade-in slide-in-from-right-2 duration-300";
+            item.className = "history-item text-right opacity-80 p-1 hover:bg-gray-800/30 rounded-lg transition-colors cursor-pointer";
+            
+            // Klik history untuk memasukkan angka lama ke input
+            item.onclick = () => {
+                currentExp = exp;
+                inputField.value = exp;
+                updateDisplay();
+            };
+
             try {
                 const latex = math.parse(exp).toTex();
                 const span = document.createElement('span');
                 katex.render(`${latex} = ${res}`, span);
                 item.appendChild(span);
             } catch(e) { item.textContent = `${exp} = ${res}`; }
+            
+            // Masukkan ke paling atas
             historyDisplay.prepend(item);
+            
+            // Scroll ke posisi paling atas agar item terbaru kelihatan
+            historyDisplay.scrollTop = 0;
         }
 
-        // Service Worker Registration for Offline Mode
+        // Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(() => console.log('nase Calc: Offline Ready'))
-                    .catch(err => console.log('SW Error:', err));
+                navigator.serviceWorker.register('sw.js');
             });
         }
 
-        // Check Online Status
         window.addEventListener('offline', () => document.getElementById('offline-badge').classList.remove('hidden'));
         window.addEventListener('online', () => document.getElementById('offline-badge').classList.add('hidden'));
     </script>
