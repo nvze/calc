@@ -25,10 +25,10 @@
         .btn-anim:active { transform: scale(0.92); background-color: rgba(255,255,255,0.1); }
         input { font-size: 16px !important; }
         
-        .history-item { animation: slideIn 0.3s ease-out; }
+        .history-item { animation: slideIn 0.2s ease-out; }
         @keyframes slideIn {
-            from { opacity: 0; transform: translateX(10px); }
-            to { opacity: 1; transform: translateX(0); }
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -44,14 +44,14 @@
             <div id="offline-badge" class="hidden text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">Offline</div>
         </div>
 
-        <div class="flex-1 bg-gray-950 p-6 flex flex-col justify-end gap-4 relative overflow-hidden">
+        <div class="flex-1 bg-gray-950 p-6 flex flex-col justify-end gap-2 relative overflow-hidden">
             <div id="history-display" class="text-gray-500 text-right text-sm h-32 overflow-y-auto pr-2 flex flex-col gap-3 scroll-smooth">
                 <div class="opacity-30 italic text-xs mt-auto">No history yet</div>
             </div>
 
             <div class="relative mt-2">
                 <input type="text" id="calc-input" class="w-full bg-transparent text-right text-4xl font-light focus:outline-none text-transparent caret-blue-500 absolute inset-0 z-10" autocomplete="off" autofocus>
-                <div id="formatted-input" class="w-full text-right text-4xl font-light min-h-[3.5rem] text-gray-100 break-words">0</div>
+                <div id="formatted-input" class="w-full text-right text-4xl font-light min-h-[3.5rem] text-gray-100 break-words leading-tight">0</div>
             </div>
 
             <div id="result-preview" class="text-right text-2xl text-blue-400 min-h-[2.5rem] font-medium border-t border-gray-800/50 pt-3 opacity-0 transition-all duration-300"></div>
@@ -62,7 +62,7 @@
             <button onclick="append(')')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-sm font-bold">)</button>
             <button onclick="append('sqrt(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-sm font-bold">√</button>
             <button onclick="append('%')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-lg font-bold">%</button>
-            <button onclick="clearAll()" class="btn-anim p-3 bg-red-500/10 text-red-500 rounded-xl text-xs font-black uppercase">AC</button>
+            <button onclick="clearAll()" class="btn-anim p-3 bg-red-500/10 text-red-500 rounded-xl text-xs font-black">AC</button>
 
             <button onclick="append('sin(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-xs">sin</button>
             <button onclick="append('cos(')" class="btn-anim p-3 bg-gray-800/40 text-blue-300 rounded-xl text-xs">cos</button>
@@ -88,7 +88,7 @@
             <button onclick="append('3')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">3</button>
             <button onclick="append('-')" class="btn-anim p-4 text-2xl text-blue-400 font-bold">−</button>
 
-            <button onclick="append('deg')" class="btn-anim p-3 bg-gray-800/40 text-[10px] text-blue-300 rounded-xl font-black uppercase tracking-tighter">Deg</button>
+            <button onclick="append('deg')" class="btn-anim p-3 bg-gray-800/40 text-[10px] text-blue-300 rounded-xl font-black uppercase">Deg</button>
             <button onclick="append('0')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">0</button>
             <button onclick="append('.')" class="btn-anim p-4 bg-gray-800/80 text-xl font-semibold rounded-xl">.</button>
             <button onclick="calculate()" class="btn-anim p-4 bg-blue-600 text-white text-2xl font-black rounded-2xl shadow-lg shadow-blue-900/40">=</button>
@@ -132,14 +132,20 @@
         function clearAll() {
             currentExp = '';
             if(inputField) inputField.value = '';
-            if(resultPreview) { resultPreview.style.opacity = '0'; }
+            resultPreview.style.opacity = '0';
             updateDisplay();
         }
 
-        // Fungsi khusus untuk memproses ekspresi dengan %
+        // LOGIKA BARU PERSENTASE (BELANJA)
         function preprocessExpression(exp) {
-            // Mengganti angka% dengan (angka/100) agar MathJS bisa mengerti
-            return exp.replace(/(\d+(\.\d+)?)\%/g, "($1/100)");
+            // 1. Ubah "X + Y%" menjadi "X + (X * Y/100)"
+            // Regex ini mencari: [Angka1] [Operator +/-] [Angka2]%
+            let processed = exp.replace(/(\d+(?:\.\d+)?)\s*([\+\-])\s*(\d+(?:\.\d+)?)\%/g, "($1 $2 ($1 * ($3 / 100)))");
+            
+            // 2. Jika % tidak diawali + atau -, anggap desimal biasa (misal: 10 * 5%)
+            processed = processed.replace(/(\d+(?:\.\d+)?)\%/g, "($1 / 100)");
+            
+            return processed;
         }
 
         function updateDisplay() {
@@ -186,7 +192,6 @@
             };
 
             try {
-                // LaTeX render untuk %
                 const texExp = exp.replace(/\%/g, "\\%");
                 const span = document.createElement('span');
                 katex.render(`${texExp} = ${res}`, span);
@@ -198,12 +203,8 @@
         }
 
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js');
-            });
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
         }
-        window.addEventListener('offline', () => document.getElementById('offline-badge').classList.remove('hidden'));
-        window.addEventListener('online', () => document.getElementById('offline-badge').classList.add('hidden'));
     </script>
 </body>
 </html>
